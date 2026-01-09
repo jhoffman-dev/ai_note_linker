@@ -30,7 +30,13 @@
     </q-drawer>
 
     <q-page-container>
-      <router-view />
+      <q-page padding>
+        <router-view />
+
+        <q-page-sticky position="bottom-right" :offset="['20px', '20px']">
+          <q-btn fab icon="add" color="accent" @click="() => {}" />
+        </q-page-sticky>
+      </q-page>
     </q-page-container>
   </q-layout>
 </template>
