@@ -30,13 +30,12 @@
     </q-drawer>
 
     <q-page-container>
-      <q-page padding>
-        <router-view />
+      <router-view />
 
-        <q-page-sticky position="bottom-right" :offset="['20px', '20px']">
+      <!-- <q-page-sticky position="bottom-right" :offset="['20px', '20px']">
           <q-btn fab icon="add" color="accent" @click="() => {}" />
-        </q-page-sticky>
-      </q-page>
+        </q-page-sticky> -->
+      <q-btn fab icon="add" color="accent" class="fab-global" />
     </q-page-container>
   </q-layout>
 </template>
@@ -61,3 +60,12 @@ function toggleLeftDrawer() {
   leftDrawerOpen.value = !leftDrawerOpen.value
 }
 </script>
+
+<style lang="scss">
+.fab-global {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 2000;
+}
+</style>

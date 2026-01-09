@@ -1,11 +1,54 @@
+<!-- <template>
+  <q-splitter
+    v-model="splitterModel"
+    horizontal
+    style="height: 400px"
+    separator-style="height:2px"
+    separator-class="bg-black"
+  >
+    <template v-slot:before>
+      <div style="height: 100%">
+        <editor-content :editor="editor" class="full-height editor-wrapper" />
+      </div>
+    </template>
+
+    <template v-slot:after>
+      <div style="height: 100%">
+        <h5 style="text-align: center; padding-top: 10px">Pane 2</h5>
+      </div>
+    </template>
+  </q-splitter>
+</template> -->
 <template>
-  <!-- <q-page class="full-height">
-    <editor-content :editor="editor" class="full-height editor-wrapper" />
-  </q-page> -->
-  <editor-content :editor="editor" class="full-height editor-wrapper" />
+  <q-page class="editor-page">
+    <div class="splitter-container">
+      <q-splitter
+        v-model="splitterModel"
+        horizontal
+        :limits="[20, 80]"
+        separator-class="bg-grey-5"
+        separator-style="height: 2px; cursor: row-resize;"
+        class="tmp-color"
+      >
+        <template #before>
+          <div class="pane">
+            <editor-content :editor="editor" class="editor-content" />
+          </div>
+        </template>
+
+        <template #after>
+          <div class="pane backlinks">
+            <div class="q-pa-sm text-center text-h6">Backlinks</div>
+            <!-- backlinks list -->
+          </div>
+        </template>
+      </q-splitter>
+    </div>
+  </q-page>
 </template>
 
 <script>
+// import { ref } from 'vue'
 import { EditorContent, Editor } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import { Markdown } from '@tiptap/markdown'
@@ -18,6 +61,7 @@ export default {
   data() {
     return {
       editor: null,
+      splitterModel: 60,
     }
   },
 
@@ -157,5 +201,45 @@ export default {
     border-top: 1.2px solid #1b4a8b;
     margin: 2rem 2rem;
   }
+}
+
+/* Critical flex/min-height chain so splitter + panes can stretch and scroll */
+.editor-page {
+  padding: 0;
+  position: relative;
+}
+
+.splitter-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.splitter-container .q-splitter {
+  height: 100%;
+}
+
+.pane {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.editor-content {
+  flex: 1;
+  overflow: auto;
+  padding: 10px;
+}
+
+/* Make the actual ProseMirror editor stretch nicely */
+.editor-content :deep(.ProseMirror) {
+  min-height: 100%;
+  outline: none;
+}
+.backlinks {
+  overflow: auto;
 }
 </style>
