@@ -2,6 +2,7 @@
 import path from 'path'
 import Database from 'better-sqlite3'
 import { app } from 'electron'
+import crypto from 'crypto'
 
 let db
 
@@ -38,6 +39,20 @@ export function getDb() {
 
     CREATE INDEX IF NOT EXISTS idx_note_links_from
       ON note_links(from_id, source);
+
+    CREATE TABLE IF NOT EXISTS tasks (
+      id TEXT PRIMARY KEY,
+      note_id TEXT NOT NULL,
+      content TEXT NOT NULL,
+      checked INTEGER NOT NULL DEFAULT 0,
+      position INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_tasks_note_id ON tasks(note_id);
+    CREATE INDEX IF NOT EXISTS idx_tasks_checked ON tasks(checked);
   `)
 
   return db
@@ -108,4 +123,82 @@ export function updateNoteLinks(fromId, toIds, source = 'user_wikilink') {
     db.exec('ROLLBACK')
     throw error
   }
+}
+
+export function updateTasks(noteId, tasks) {
+  const db = getDb()
+  const now = Date.now()
+
+  db.exec('BEGIN')
+
+  try {
+    // Get existing tasks to preserve IDs and checked states
+    const existingTasks = db
+      .prepare('SELECT id, content, checked FROM tasks WHERE note_id = ?')
+      .all(noteId)
+
+    // Create a map of content -> existing task for matching
+    const existingMap = new Map()
+    for (const task of existingTasks) {
+      existingMap.set(task.content, task)
+    }
+
+    // Delete existing tasks for this note
+    db.prepare('DELETE FROM tasks WHERE note_id = ?').run(noteId)
+
+    // Insert new tasks, preserving IDs and checked state when content matches
+    const insertStmt = db.prepare(`
+      INSERT INTO tasks (id, note_id, content, checked, position, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `)
+
+    for (const task of tasks) {
+      const existing = existingMap.get(task.content)
+      const taskId = existing ? existing.id : crypto.randomUUID()
+      const checked = task.checked ? 1 : 0
+
+      insertStmt.run(taskId, noteId, task.content, checked, task.position, now, now)
+    }
+
+    db.exec('COMMIT')
+  } catch (error) {
+    db.exec('ROLLBACK')
+    throw error
+  }
+}
+
+export function getAllTasks(checkedFilter = null) {
+  const db = getDb()
+  let query = `
+    SELECT t.*, n.title as note_title
+    FROM tasks t
+    JOIN notes n ON t.note_id = n.id
+  `
+
+  if (checkedFilter !== null) {
+    query += ' WHERE t.checked = ?'
+    return db.prepare(query + ' ORDER BY t.updated_at DESC').all(checkedFilter ? 1 : 0)
+  }
+
+  return db.prepare(query + ' ORDER BY t.updated_at DESC').all()
+}
+
+export function getTasksForNote(noteId) {
+  return getDb().prepare('SELECT * FROM tasks WHERE note_id = ? ORDER BY position').all(noteId)
+}
+
+export function toggleTaskChecked(taskId) {
+  const db = getDb()
+  const now = Date.now()
+
+  db.prepare(
+    `
+    UPDATE tasks
+    SET checked = NOT checked, updated_at = ?
+    WHERE id = ?
+  `,
+  ).run(now, taskId)
+
+  // Return the updated task
+  return db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId)
 }

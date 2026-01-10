@@ -38,3 +38,10 @@ contextBridge.exposeInMainWorld('notesApi', {
   updateLinks: (fromId, toIds, source) =>
     ipcRenderer.invoke('notes:updateLinks', fromId, toIds, source),
 })
+
+contextBridge.exposeInMainWorld('tasksApi', {
+  update: (noteId, tasks) => ipcRenderer.invoke('tasks:update', noteId, tasks),
+  getAll: (checkedFilter) => ipcRenderer.invoke('tasks:getAll', checkedFilter),
+  getForNote: (noteId) => ipcRenderer.invoke('tasks:getForNote', noteId),
+  toggle: (taskId) => ipcRenderer.invoke('tasks:toggle', taskId),
+})

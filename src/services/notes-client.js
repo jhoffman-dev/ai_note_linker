@@ -16,3 +16,18 @@ export const notesClient = {
     return window.notesApi.updateLinks(fromId, toIds, source)
   },
 }
+
+export const tasksClient = {
+  update(noteId, tasks) {
+    return window.tasksApi.update(noteId, tasks)
+  },
+  getAll(checkedFilter = null) {
+    return window.tasksApi.getAll(checkedFilter)
+  },
+  getForNote(noteId) {
+    return window.tasksApi.getForNote(noteId)
+  },
+  toggle(taskId) {
+    return window.tasksApi.toggle(taskId)
+  },
+}

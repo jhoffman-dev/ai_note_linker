@@ -4,9 +4,9 @@
       <q-toolbar>
         <q-btn flat dense round icon="menu" aria-label="Menu" @click="toggleLeftDrawer" />
 
-        <q-toolbar-title> Quasar App </q-toolbar-title>
+        <q-toolbar-title> AI Note Linker </q-toolbar-title>
 
-        <div>Quasar v{{ $q.version }}</div>
+        <div>AI Note Linker v0.0.1</div>
       </q-toolbar>
     </q-header>
 
@@ -24,6 +24,12 @@
             <q-icon name="edit" />
           </q-item-section>
           <q-item-section> Editor </q-item-section>
+        </q-item>
+        <q-item clickable v-ripple @click="tasksClick">
+          <q-item-section avatar>
+            <q-icon name="checklist" />
+          </q-item-section>
+          <q-item-section> Tasks </q-item-section>
         </q-item>
         <q-separator spaced />
 
@@ -69,9 +75,11 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNotesStore } from 'src/stores/notes-store'
+import { useQuasar } from 'quasar'
 
 const router = useRouter()
 const notesStore = useNotesStore()
+const $q = useQuasar()
 
 const notes = computed(() => notesStore.notes)
 const currentNote = computed(() => notesStore.currentNote)
@@ -85,14 +93,28 @@ function editorClick() {
   router.push('/editor')
 }
 
+function tasksClick() {
+  router.push('/tasks')
+}
+
 async function selectNote(id) {
   await notesStore.openNote(id)
   router.push('/editor')
+
+  // Close drawer on smaller screens
+  if ($q.screen.lt.md) {
+    leftDrawerOpen.value = false
+  }
 }
 
 async function createNewNote() {
   await notesStore.createNote()
   router.push('/editor')
+
+  // Close drawer on smaller screens
+  if ($q.screen.lt.md) {
+    leftDrawerOpen.value = false
+  }
 }
 
 function formatDate(dateString) {

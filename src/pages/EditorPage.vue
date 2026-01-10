@@ -116,6 +116,8 @@ export default {
         if (this.editor && this.currentNote) {
           this.editor.commands.setContent(this.currentNote.content || '<p>Untitled</p>')
           this.updateWikilinks()
+          // Sync task states from database after content is loaded
+          await this.syncTasksFromDatabase()
         }
       },
     },
@@ -218,7 +220,7 @@ export default {
           return false
         },
       },
-      onUpdate: ({ editor }) => {
+      onUpdate: ({ editor, transaction }) => {
         if (this.currentNote) {
           const html = editor.getHTML()
           this.currentNote.content = html
@@ -228,7 +230,25 @@ export default {
           const firstLine = text.split('\n')[0].trim()
           this.currentNote.title = firstLine || 'Untitled'
 
-          // Debounced save
+          // Check if the transaction modified any taskItem nodes
+          let taskChanged = false
+          transaction.steps.forEach((step) => {
+            if (step.jsonID === 'replace' || step.jsonID === 'replaceAround') {
+              const { from, to } = step
+              transaction.docs[0].nodesBetween(from, to, (node) => {
+                if (node.type.name === 'taskItem') {
+                  taskChanged = true
+                }
+              })
+            }
+          })
+
+          // If a task changed, save immediately without debouncing
+          if (taskChanged) {
+            this.extractAndSaveTasks()
+          }
+
+          // Debounced save for content
           this.debounceSave()
         }
       },
@@ -240,6 +260,20 @@ export default {
     }
 
     this.loadNotes()
+
+    // Sync tasks from database on mount if there's a current note
+    if (this.currentNote) {
+      this.$nextTick(() => {
+        this.syncTasksFromDatabase()
+      })
+    }
+  },
+
+  activated() {
+    // Sync tasks when returning to this view (e.g., from tasks list)
+    if (this.editor && this.currentNote) {
+      this.syncTasksFromDatabase()
+    }
   },
 
   beforeUnmount() {
@@ -250,6 +284,7 @@ export default {
     if (this.currentNote) {
       this.saveCurrent()
       this.extractAndSaveWikilinks()
+      this.extractAndSaveTasks()
     }
     if (this.editor) {
       this.editor.destroy()
@@ -257,7 +292,14 @@ export default {
   },
 
   methods: {
-    ...mapActions(useNotesStore, ['loadNotes', 'openNote', 'saveCurrent', 'updateNoteLinks']),
+    ...mapActions(useNotesStore, [
+      'loadNotes',
+      'openNote',
+      'saveCurrent',
+      'updateNoteLinks',
+      'updateNoteTasks',
+      'loadTasksForNote',
+    ]),
 
     debounceSave() {
       if (this.saveTimeout) {
@@ -267,6 +309,8 @@ export default {
         await this.saveCurrent()
         // Extract and save wikilinks after saving content
         this.extractAndSaveWikilinks()
+        // Extract and save tasks after saving content
+        this.extractAndSaveTasks()
       }, 1000)
     },
 
@@ -282,6 +326,29 @@ export default {
 
       // Update the links in the database
       this.updateNoteLinks(this.currentNote.id, linkedNoteIds)
+    },
+
+    extractAndSaveTasks() {
+      if (!this.editor || !this.currentNote) return
+
+      const tasks = []
+      let position = 0
+
+      this.editor.state.doc.descendants((node) => {
+        if (node.type.name === 'taskItem') {
+          const content = node.textContent.trim()
+          const checked = node.attrs.checked || false
+
+          tasks.push({
+            content,
+            checked,
+            position: position++,
+          })
+        }
+      })
+
+      // Update tasks in the database (IDs and checked state will be preserved by matching content)
+      this.updateNoteTasks(this.currentNote.id, tasks)
     },
 
     updateWikilinks() {
@@ -305,6 +372,44 @@ export default {
               })
               modified = true
             }
+          }
+        }
+      })
+
+      if (modified) {
+        this.editor.view.dispatch(tr)
+      }
+    },
+
+    async syncTasksFromDatabase() {
+      if (!this.editor || !this.currentNote) return
+
+      // Load tasks from database for current note
+      const dbTasks = await this.loadTasksForNote(this.currentNote.id)
+      if (!dbTasks || dbTasks.length === 0) return
+
+      // Create a map of content -> checked state
+      const taskStateMap = new Map()
+      for (const task of dbTasks) {
+        taskStateMap.set(task.content, !!task.checked)
+      }
+
+      // Update taskItem nodes in the editor to match database state
+      const { state } = this.editor
+      const { tr } = state
+      let modified = false
+
+      state.doc.descendants((node, pos) => {
+        if (node.type.name === 'taskItem') {
+          const content = node.textContent.trim()
+          const dbChecked = taskStateMap.get(content)
+
+          if (dbChecked !== undefined && node.attrs.checked !== dbChecked) {
+            tr.setNodeMarkup(pos, undefined, {
+              ...node.attrs,
+              checked: dbChecked,
+            })
+            modified = true
           }
         }
       })

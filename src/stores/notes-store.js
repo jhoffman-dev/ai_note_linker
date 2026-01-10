@@ -1,12 +1,13 @@
 // src/stores/notesStore.js
 import { defineStore } from 'pinia'
-import { notesClient } from 'src/services/notes-client'
+import { notesClient, tasksClient } from 'src/services/notes-client'
 
 export const useNotesStore = defineStore('notes', {
   state: () => ({
     notes: [],
     currentNote: null,
     backlinks: [],
+    tasks: [],
     loading: false,
   }),
 
@@ -78,6 +79,30 @@ export const useNotesStore = defineStore('notes', {
       if (this.currentNote) {
         await this.loadBacklinks(this.currentNote.id)
       }
+    },
+
+    async updateNoteTasks(noteId, tasks) {
+      if (!noteId) return
+      await tasksClient.update(noteId, tasks)
+    },
+
+    async loadAllTasks(checkedFilter = null) {
+      this.tasks = await tasksClient.getAll(checkedFilter)
+    },
+
+    async loadTasksForNote(noteId) {
+      if (!noteId) return
+      return await tasksClient.getForNote(noteId)
+    },
+
+    async toggleTask(taskId) {
+      const updatedTask = await tasksClient.toggle(taskId)
+      // Update the task in the local state
+      const index = this.tasks.findIndex((t) => t.id === taskId)
+      if (index >= 0) {
+        this.tasks[index] = { ...this.tasks[index], ...updatedTask }
+      }
+      return updatedTask
     },
   },
 })
