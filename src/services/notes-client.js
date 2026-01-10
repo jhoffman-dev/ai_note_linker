@@ -9,4 +9,10 @@ export const notesClient = {
   upsert(note) {
     return window.notesApi.upsert(note)
   },
+  getBacklinks(noteId) {
+    return window.notesApi.getBacklinks(noteId)
+  },
+  updateLinks(fromId, toIds, source = 'user_wikilink') {
+    return window.notesApi.updateLinks(fromId, toIds, source)
+  },
 }

@@ -17,8 +17,35 @@
 
         <template #after>
           <div class="pane backlinks">
-            <div class="q-pa-sm text-center text-h6">Backlinks</div>
-            <!-- backlinks list -->
+            <div class="backlinks-header q-pa-sm">
+              <div class="text-h6">Backlinks</div>
+              <div class="text-caption text-grey-6">
+                {{ backlinks.length }}
+                {{ backlinks.length === 1 ? 'note links' : 'notes link' }} here
+              </div>
+            </div>
+            <q-scroll-area class="backlinks-list">
+              <q-list v-if="backlinks.length > 0">
+                <q-item
+                  v-for="backlink in backlinks"
+                  :key="backlink.id"
+                  clickable
+                  v-ripple
+                  @click="openNote(backlink.id)"
+                >
+                  <q-item-section>
+                    <q-item-label>{{ backlink.title || 'Untitled' }}</q-item-label>
+                    <q-item-label caption>
+                      <q-badge
+                        :color="backlink.source === 'user_wikilink' ? 'blue' : 'green'"
+                        :label="backlink.source"
+                      />
+                    </q-item-label>
+                  </q-item-section>
+                </q-item>
+              </q-list>
+              <div v-else class="q-pa-md text-center text-grey-6">No backlinks yet</div>
+            </q-scroll-area>
           </div>
         </template>
       </q-splitter>
@@ -51,7 +78,7 @@ export default {
   },
 
   computed: {
-    ...mapState(useNotesStore, ['currentNote', 'notes', 'loading']),
+    ...mapState(useNotesStore, ['currentNote', 'notes', 'loading', 'backlinks']),
   },
 
   watch: {
@@ -141,6 +168,7 @@ export default {
     }
     if (this.currentNote) {
       this.saveCurrent()
+      this.extractAndSaveWikilinks()
     }
     if (this.editor) {
       this.editor.destroy()
@@ -148,15 +176,31 @@ export default {
   },
 
   methods: {
-    ...mapActions(useNotesStore, ['loadNotes', 'openNote', 'saveCurrent']),
+    ...mapActions(useNotesStore, ['loadNotes', 'openNote', 'saveCurrent', 'updateNoteLinks']),
 
     debounceSave() {
       if (this.saveTimeout) {
         clearTimeout(this.saveTimeout)
       }
-      this.saveTimeout = setTimeout(() => {
-        this.saveCurrent()
+      this.saveTimeout = setTimeout(async () => {
+        await this.saveCurrent()
+        // Extract and save wikilinks after saving content
+        this.extractAndSaveWikilinks()
       }, 1000)
+    },
+
+    extractAndSaveWikilinks() {
+      if (!this.editor || !this.currentNote) return
+
+      const linkedNoteIds = []
+      this.editor.state.doc.descendants((node) => {
+        if (node.type.name === 'wikilink' && node.attrs.id) {
+          linkedNoteIds.push(node.attrs.id)
+        }
+      })
+
+      // Update the links in the database
+      this.updateNoteLinks(this.currentNote.id, linkedNoteIds)
     },
 
     updateWikilinks() {
@@ -365,7 +409,19 @@ export default {
   min-height: 100%;
   outline: none;
 }
+
 .backlinks {
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.backlinks-header {
+  border-bottom: 1px solid #e0e0e0;
+  flex-shrink: 0;
+}
+
+.backlinks-list {
+  flex: 1;
+  height: 100%;
 }
 </style>

@@ -6,6 +6,7 @@ export const useNotesStore = defineStore('notes', {
   state: () => ({
     notes: [],
     currentNote: null,
+    backlinks: [],
     loading: false,
   }),
 
@@ -25,6 +26,8 @@ export const useNotesStore = defineStore('notes', {
         await this.saveCurrent()
       }
       this.currentNote = await notesClient.get(id)
+      // Load backlinks for the opened note
+      await this.loadBacklinks(id)
     },
 
     async createNote() {
@@ -60,6 +63,20 @@ export const useNotesStore = defineStore('notes', {
       } else {
         // New note, add to list
         this.notes.unshift({ id: saved.id, title: saved.title, updated_at: saved.updated_at })
+      }
+    },
+
+    async loadBacklinks(noteId) {
+      if (!noteId) return
+      this.backlinks = await notesClient.getBacklinks(noteId)
+    },
+
+    async updateNoteLinks(fromId, linkedNoteIds) {
+      if (!fromId) return
+      await notesClient.updateLinks(fromId, linkedNoteIds, 'user_wikilink')
+      // Reload backlinks if we're viewing one of the affected notes
+      if (this.currentNote) {
+        await this.loadBacklinks(this.currentNote.id)
       }
     },
   },

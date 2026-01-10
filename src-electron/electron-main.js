@@ -3,12 +3,16 @@ import path from 'node:path'
 import os from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { ipcMain } from 'electron'
-import { getNote, listNotes, upsertNote } from './db/index.js'
+import { getNote, listNotes, upsertNote, getBacklinks, updateNoteLinks } from './db/index.js'
 
 export function registerIpcHandlers() {
   ipcMain.handle('notes:list', () => listNotes())
   ipcMain.handle('notes:get', (_evt, id) => getNote(id))
   ipcMain.handle('notes:upsert', (_evt, note) => upsertNote(note))
+  ipcMain.handle('notes:getBacklinks', (_evt, noteId) => getBacklinks(noteId))
+  ipcMain.handle('notes:updateLinks', (_evt, fromId, toIds, source) =>
+    updateNoteLinks(fromId, toIds, source),
+  )
 }
 
 // needed in case process is undefined under Linux

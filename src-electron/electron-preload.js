@@ -34,4 +34,7 @@ contextBridge.exposeInMainWorld('notesApi', {
   list: () => ipcRenderer.invoke('notes:list'),
   get: (id) => ipcRenderer.invoke('notes:get', id),
   upsert: (note) => ipcRenderer.invoke('notes:upsert', note),
+  getBacklinks: (noteId) => ipcRenderer.invoke('notes:getBacklinks', noteId),
+  updateLinks: (fromId, toIds, source) =>
+    ipcRenderer.invoke('notes:updateLinks', fromId, toIds, source),
 })
