@@ -8,7 +8,7 @@
         :class="{ 'is-selected': index === selectedIndex }"
         @click="selectItem(index)"
       >
-        [[{{ item.label }}]]
+        {{ item.label }}
       </button>
     </template>
     <div v-else class="wikilink-item empty">No results</div>

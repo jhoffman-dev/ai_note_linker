@@ -550,7 +550,6 @@ export default {
     font-weight: 500;
     cursor: pointer;
     text-decoration: none;
-    border-bottom: 1px solid #1b4a8b;
     padding: 0 2px;
 
     &:hover {
