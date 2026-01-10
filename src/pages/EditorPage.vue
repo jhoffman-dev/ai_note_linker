@@ -55,13 +55,37 @@
 
 <script>
 import { EditorContent, Editor } from '@tiptap/vue-3'
-import StarterKit from '@tiptap/starter-kit'
+import Document from '@tiptap/extension-document'
+import Paragraph from '@tiptap/extension-paragraph'
+import Text from '@tiptap/extension-text'
+import Bold from '@tiptap/extension-bold'
+import Italic from '@tiptap/extension-italic'
+import Strike from '@tiptap/extension-strike'
+import Code from '@tiptap/extension-code'
+import CodeBlock from '@tiptap/extension-code-block'
+import Heading from '@tiptap/extension-heading'
+import BulletList from '@tiptap/extension-bullet-list'
+import OrderedList from '@tiptap/extension-ordered-list'
+import ListItem from '@tiptap/extension-list-item'
+import Blockquote from '@tiptap/extension-blockquote'
+import HorizontalRule from '@tiptap/extension-horizontal-rule'
+import HardBreak from '@tiptap/extension-hard-break'
+import Dropcursor from '@tiptap/extension-dropcursor'
+import Gapcursor from '@tiptap/extension-gapcursor'
+import History from '@tiptap/extension-history'
 import { Markdown } from '@tiptap/markdown'
 import { useNotesStore } from 'src/stores/notes-store'
 import { mapState, mapActions } from 'pinia'
 import { Wikilink } from 'src/extensions/Wikilink.js'
 import wikilinkSuggestion from 'src/extensions/wikilinkSuggestion.js'
+import TaskList from '@tiptap/extension-task-list'
+import TaskItem from '@tiptap/extension-task-item'
 import 'tippy.js/dist/tippy.css'
+import MarkdownIt from 'markdown-it'
+import markdownItTaskLists from 'markdown-it-task-lists'
+
+const md = new MarkdownIt()
+md.use(markdownItTaskLists, { enabled: true })
 
 export default {
   components: {
@@ -112,8 +136,43 @@ export default {
     this.editor = new Editor({
       content: this.currentNote?.content || '<p>Untitled</p>',
       extensions: [
-        StarterKit,
-        Markdown,
+        Document,
+        Paragraph,
+        Text,
+        Bold,
+        Italic,
+        Strike,
+        Code,
+        CodeBlock,
+        Heading,
+        Blockquote,
+        HorizontalRule,
+        HardBreak,
+        Dropcursor,
+        Gapcursor,
+        History,
+        TaskList,
+        TaskItem.configure({
+          nested: true,
+          HTMLAttributes: {
+            class: 'task-item',
+          },
+        }),
+        // Regular lists after task lists
+        ListItem,
+        BulletList.configure({
+          keepMarks: true,
+          keepAttributes: false,
+        }),
+        OrderedList.configure({
+          keepMarks: true,
+          keepAttributes: false,
+        }),
+        Markdown.configure({
+          html: true,
+          transformPastedText: true,
+          transformCopiedText: false,
+        }),
         Wikilink.configure({
           suggestion: wikilinkSuggestion,
           HTMLAttributes: {
@@ -124,6 +183,28 @@ export default {
       editorProps: {
         attributes: {
           spellcheck: 'false',
+        },
+        handlePaste: (view, event) => {
+          const text = event.clipboardData?.getData('text/plain')
+          if (!text) return false
+
+          // Check if it looks like markdown
+          const hasMarkdown = /([*_#`[\]~]|^[-+*]\s|^\d+\.\s)/m.test(text)
+          if (hasMarkdown) {
+            event.preventDefault()
+
+            // Convert task list markdown syntax to just [ ] so TipTap can handle it
+            const processedText = text.replace(/^(\s*)[-+*]\s+(\[[xX ]\])/gm, '$1$2')
+
+            // Convert markdown to HTML
+            const html = md.render(processedText)
+
+            // Use the editor instance to insert content
+            this.editor.commands.insertContent(html)
+            return true
+          }
+
+          return false
         },
         handleClickOn: (view, pos, node, nodePos, event) => {
           if (node.type.name === 'wikilink') {
@@ -369,6 +450,38 @@ export default {
 
     &:hover {
       background-color: #1b4a8b1a;
+    }
+  }
+
+  /* Task list styles */
+  ul[data-type='taskList'] {
+    list-style: none;
+    padding-left: 0;
+
+    li {
+      display: flex;
+      align-items: flex-start;
+
+      > label {
+        flex: 0 0 auto;
+        margin-right: 0.5rem;
+        user-select: none;
+        margin-top: 0.25rem;
+      }
+
+      > div {
+        flex: 1 1 auto;
+      }
+    }
+
+    input[type='checkbox'] {
+      cursor: pointer;
+      width: 1.2em;
+      height: 1.2em;
+    }
+
+    p {
+      margin: 0;
     }
   }
 }
