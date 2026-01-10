@@ -18,8 +18,9 @@ export default {
     const notesStore = useNotesStore()
     const router = useRouter()
     let graph = null
+    let resizeCleanup = null
 
-    const buildGraphData = () => {
+    const buildGraphData = async () => {
       const notes = notesStore.notes
 
       // Create nodes from notes
@@ -29,25 +30,18 @@ export default {
         favorite: note.favorite,
       }))
 
-      // Fetch links from the store - we'll need to add a method to get all links
+      // Fetch links from the database
       const links = []
+      const allLinks = await window.notesApi.getAllLinks?.()
 
-      // We need to query the database for all note_links
-      // For now, let's use a placeholder - we'll add the database query
-      window.notesApi.getAllLinks?.().then((allLinks) => {
-        if (allLinks) {
-          allLinks.forEach((link) => {
-            links.push({
-              source: link.from_id,
-              target: link.to_id,
-            })
+      if (allLinks) {
+        allLinks.forEach((link) => {
+          links.push({
+            source: link.from_id,
+            target: link.to_id,
           })
-
-          if (graph) {
-            graph.graphData({ nodes, links })
-          }
-        }
-      })
+        })
+      }
 
       return { nodes, links }
     }
@@ -55,19 +49,18 @@ export default {
     onMounted(async () => {
       await notesStore.loadNotes()
 
-      const data = buildGraphData()
+      const data = await buildGraphData()
 
       graph = ForceGraph()(graphContainer.value)
         .graphData(data)
         .nodeLabel('name')
-        .nodeColor((node) => (node.favorite ? '#f59e0b' : '#1b4a8b'))
+        .nodeColor((node) => (node.favorite === 1 ? '#f59e0b' : '#1b4a8b'))
         .nodeRelSize(6)
         .linkDirectionalArrowLength(6)
         .linkDirectionalArrowRelPos(1)
         .linkColor(() => '#999')
         .linkWidth(1.5)
         .onNodeClick((node) => {
-          // Open the note when clicked
           notesStore.openNote(node.id)
           router.push('/editor')
         })
@@ -86,14 +79,16 @@ export default {
       window.addEventListener('resize', handleResize)
 
       // Store cleanup function
-      graph._cleanupResize = () => {
+      resizeCleanup = () => {
         window.removeEventListener('resize', handleResize)
       }
     })
 
     onBeforeUnmount(() => {
+      if (resizeCleanup) {
+        resizeCleanup()
+      }
       if (graph) {
-        graph._cleanupResize?.()
         graph = null
       }
     })

@@ -54,7 +54,7 @@ export const useNotesStore = defineStore('notes', {
         content: this.currentNote.content,
         updated_at: this.currentNote.updated_at,
         created_at: this.currentNote.created_at,
-        favorite: this.currentNote.favorite || 0,
+        favorite: this.currentNote.favorite ?? 0,
       }
       const saved = await notesClient.upsert(noteToSave)
       this.currentNote = saved
