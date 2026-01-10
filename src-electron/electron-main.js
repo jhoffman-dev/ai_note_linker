@@ -13,6 +13,7 @@ import {
   getAllTasks,
   getTasksForNote,
   toggleTaskChecked,
+  toggleNoteFavorite,
 } from './db/index.js'
 
 export function registerIpcHandlers() {
@@ -23,6 +24,7 @@ export function registerIpcHandlers() {
   ipcMain.handle('notes:updateLinks', (_evt, fromId, toIds, source) =>
     updateNoteLinks(fromId, toIds, source),
   )
+  ipcMain.handle('notes:toggleFavorite', (_evt, noteId) => toggleNoteFavorite(noteId))
   ipcMain.handle('tasks:update', (_evt, noteId, tasks) => updateTasks(noteId, tasks))
   ipcMain.handle('tasks:getAll', (_evt, checkedFilter) => getAllTasks(checkedFilter))
   ipcMain.handle('tasks:getForNote', (_evt, noteId) => getTasksForNote(noteId))

@@ -15,6 +15,9 @@ export const notesClient = {
   updateLinks(fromId, toIds, source = 'user_wikilink') {
     return window.notesApi.updateLinks(fromId, toIds, source)
   },
+  toggleFavorite(noteId) {
+    return window.notesApi.toggleFavorite(noteId)
+  },
 }
 
 export const tasksClient = {

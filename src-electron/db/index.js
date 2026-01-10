@@ -55,11 +55,24 @@ export function getDb() {
     CREATE INDEX IF NOT EXISTS idx_tasks_checked ON tasks(checked);
   `)
 
+  // Check if favorite column exists and add it if it doesn't
+  const tableInfo = db.prepare("PRAGMA table_info(notes)").all()
+  const hasFavoriteColumn = tableInfo.some(col => col.name === 'favorite')
+
+  if (!hasFavoriteColumn) {
+    db.exec(`ALTER TABLE notes ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0;`)
+    db.exec(`CREATE INDEX idx_notes_favorite ON notes(favorite);`)
+  }
+
   return db
 }
 
 export function listNotes() {
-  return getDb().prepare('SELECT id, title, updated_at FROM notes ORDER BY updated_at DESC').all()
+  return getDb()
+    .prepare(
+      'SELECT id, title, updated_at, favorite FROM notes ORDER BY favorite DESC, updated_at DESC',
+    )
+    .all()
 }
 
 export function upsertNote(note) {
@@ -67,12 +80,13 @@ export function upsertNote(note) {
   getDb()
     .prepare(
       `
-    INSERT INTO notes (id, title, content, updated_at)
-    VALUES (@id, @title, @content, @updated_at)
+    INSERT INTO notes (id, title, content, updated_at, favorite)
+    VALUES (@id, @title, @content, @updated_at, COALESCE(@favorite, 0))
     ON CONFLICT(id) DO UPDATE SET
       title=excluded.title,
       content=excluded.content,
-      updated_at=excluded.updated_at
+      updated_at=excluded.updated_at,
+      favorite=COALESCE(excluded.favorite, notes.favorite)
   `,
     )
     .run({ ...note, updated_at: now })
@@ -201,4 +215,20 @@ export function toggleTaskChecked(taskId) {
 
   // Return the updated task
   return db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId)
+}
+
+export function toggleNoteFavorite(noteId) {
+  const db = getDb()
+  const now = Date.now()
+
+  db.prepare(
+    `
+    UPDATE notes
+    SET favorite = NOT favorite, updated_at = ?
+    WHERE id = ?
+  `,
+  ).run(now, noteId)
+
+  // Return the updated note
+  return db.prepare('SELECT * FROM notes WHERE id = ?').get(noteId)
 }

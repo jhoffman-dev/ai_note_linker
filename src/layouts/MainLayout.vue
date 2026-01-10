@@ -33,10 +33,10 @@
         </q-item>
         <q-separator spaced />
 
-        <q-item-label header> Notes </q-item-label>
-        <q-scroll-area class="notes-list">
+        <q-item-label header v-if="favoriteNotes.length > 0"> Favorites </q-item-label>
+        <q-scroll-area v-if="favoriteNotes.length > 0" class="favorites-list">
           <q-item
-            v-for="note in notes"
+            v-for="note in favoriteNotes"
             :key="note.id"
             clickable
             v-ripple
@@ -47,8 +47,49 @@
               <q-item-label>{{ note.title || 'Untitled' }}</q-item-label>
               <q-item-label caption>{{ formatDate(note.updated_at) }}</q-item-label>
             </q-item-section>
+            <q-item-section side>
+              <q-btn
+                flat
+                dense
+                round
+                size="sm"
+                :icon="note.favorite ? 'star' : 'star_border'"
+                :color="note.favorite ? 'amber-7' : 'grey-5'"
+                @click.stop="toggleFavorite(note.id)"
+              />
+            </q-item-section>
           </q-item>
-          <q-item v-if="notes.length === 0 && !loading">
+        </q-scroll-area>
+
+        <q-separator spaced v-if="favoriteNotes.length > 0" />
+
+        <q-item-label header> Notes </q-item-label>
+        <q-scroll-area class="notes-list">
+          <q-item
+            v-for="note in allNotes"
+            :key="note.id"
+            clickable
+            v-ripple
+            @click="selectNote(note.id)"
+            :active="currentNote?.id === note.id"
+          >
+            <q-item-section>
+              <q-item-label>{{ note.title || 'Untitled' }}</q-item-label>
+              <q-item-label caption>{{ formatDate(note.updated_at) }}</q-item-label>
+            </q-item-section>
+            <q-item-section side>
+              <q-btn
+                flat
+                dense
+                round
+                size="sm"
+                :icon="note.favorite ? 'star' : 'star_border'"
+                :color="note.favorite ? 'amber-7' : 'grey-5'"
+                @click.stop="toggleFavorite(note.id)"
+              />
+            </q-item-section>
+          </q-item>
+          <q-item v-if="allNotes.length === 0 && !loading">
             <q-item-section class="text-grey-6 text-center"> No notes yet </q-item-section>
           </q-item>
           <q-item v-if="loading">
@@ -84,6 +125,9 @@ const $q = useQuasar()
 const notes = computed(() => notesStore.notes)
 const currentNote = computed(() => notesStore.currentNote)
 const loading = computed(() => notesStore.loading)
+
+const favoriteNotes = computed(() => notes.value.filter((note) => note.favorite))
+const allNotes = computed(() => notes.value)
 
 function homeClick() {
   router.push('/')
@@ -123,6 +167,11 @@ function formatDate(dateString) {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+async function toggleFavorite(noteId) {
+  await notesStore.toggleNoteFavorite(noteId)
+  console.log(favoriteNotes.value)
+}
+
 const leftDrawerOpen = ref(false)
 
 function toggleLeftDrawer() {
@@ -140,6 +189,11 @@ onMounted(() => {
   right: 20px;
   bottom: 20px;
   z-index: 2000;
+}
+
+.favorites-list {
+  height: 150px;
+  max-height: 200px;
 }
 
 .notes-list {

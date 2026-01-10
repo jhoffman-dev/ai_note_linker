@@ -38,6 +38,7 @@ export const useNotesStore = defineStore('notes', {
         content: '<p>Untitled</p>',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
+        favorite: 0,
       }
       this.currentNote = await notesClient.upsert(newNote)
       await this.loadNotes()
@@ -60,10 +61,20 @@ export const useNotesStore = defineStore('notes', {
       // Update the note in the list without full reload
       const index = this.notes.findIndex((n) => n.id === saved.id)
       if (index >= 0) {
-        this.notes[index] = { id: saved.id, title: saved.title, updated_at: saved.updated_at }
+        this.notes[index] = {
+          id: saved.id,
+          title: saved.title,
+          updated_at: saved.updated_at,
+          favorite: saved.favorite || this.notes[index].favorite || 0,
+        }
       } else {
         // New note, add to list
-        this.notes.unshift({ id: saved.id, title: saved.title, updated_at: saved.updated_at })
+        this.notes.unshift({
+          id: saved.id,
+          title: saved.title,
+          updated_at: saved.updated_at,
+          favorite: saved.favorite || 0,
+        })
       }
     },
 
@@ -103,6 +114,15 @@ export const useNotesStore = defineStore('notes', {
         this.tasks[index] = { ...this.tasks[index], ...updatedTask }
       }
       return updatedTask
+    },
+
+    async toggleNoteFavorite(noteId) {
+      const updatedNote = await notesClient.toggleFavorite(noteId)
+
+      // Reload notes to get updated favorite status
+      await this.loadNotes()
+
+      return updatedNote
     },
   },
 })

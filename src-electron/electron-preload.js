@@ -37,6 +37,7 @@ contextBridge.exposeInMainWorld('notesApi', {
   getBacklinks: (noteId) => ipcRenderer.invoke('notes:getBacklinks', noteId),
   updateLinks: (fromId, toIds, source) =>
     ipcRenderer.invoke('notes:updateLinks', fromId, toIds, source),
+  toggleFavorite: (noteId) => ipcRenderer.invoke('notes:toggleFavorite', noteId),
 })
 
 contextBridge.exposeInMainWorld('tasksApi', {
