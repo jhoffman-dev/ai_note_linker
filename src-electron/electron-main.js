@@ -8,6 +8,7 @@ import {
   listNotes,
   upsertNote,
   getBacklinks,
+  getAllLinks,
   updateNoteLinks,
   updateTasks,
   getAllTasks,
@@ -21,6 +22,7 @@ export function registerIpcHandlers() {
   ipcMain.handle('notes:get', (_evt, id) => getNote(id))
   ipcMain.handle('notes:upsert', (_evt, note) => upsertNote(note))
   ipcMain.handle('notes:getBacklinks', (_evt, noteId) => getBacklinks(noteId))
+  ipcMain.handle('notes:getAllLinks', () => getAllLinks())
   ipcMain.handle('notes:updateLinks', (_evt, fromId, toIds, source) =>
     updateNoteLinks(fromId, toIds, source),
   )

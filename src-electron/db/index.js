@@ -111,6 +111,12 @@ export function getBacklinks(noteId) {
     .all(noteId)
 }
 
+export function getAllLinks() {
+  return getDb()
+    .prepare('SELECT from_id, to_id, source FROM note_links')
+    .all()
+}
+
 export function updateNoteLinks(fromId, toIds, source = 'user_wikilink') {
   const db = getDb()
   const now = Date.now()

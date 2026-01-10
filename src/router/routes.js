@@ -6,6 +6,7 @@ const routes = [
       { path: '', component: () => import('pages/IndexPage.vue') },
       { path: 'editor', component: () => import('pages/EditorPage.vue') },
       { path: 'tasks', component: () => import('pages/TasksPage.vue') },
+      { path: 'graph', component: () => import('pages/GraphPage.vue') },
     ],
   },
 

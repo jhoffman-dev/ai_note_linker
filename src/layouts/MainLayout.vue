@@ -31,6 +31,12 @@
           </q-item-section>
           <q-item-section> Tasks </q-item-section>
         </q-item>
+        <q-item clickable v-ripple @click="graphClick">
+          <q-item-section avatar>
+            <q-icon name="account_tree" />
+          </q-item-section>
+          <q-item-section> Graph </q-item-section>
+        </q-item>
         <q-separator spaced />
 
         <q-item-label header v-if="favoriteNotes.length > 0"> Favorites </q-item-label>
@@ -139,6 +145,10 @@ function editorClick() {
 
 function tasksClick() {
   router.push('/tasks')
+}
+
+function graphClick() {
+  router.push('/graph')
 }
 
 async function selectNote(id) {
