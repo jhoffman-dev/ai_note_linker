@@ -32,6 +32,9 @@ import StarterKit from '@tiptap/starter-kit'
 import { Markdown } from '@tiptap/markdown'
 import { useNotesStore } from 'src/stores/notes-store'
 import { mapState, mapActions } from 'pinia'
+import { Wikilink } from 'src/extensions/Wikilink.js'
+import wikilinkSuggestion from 'src/extensions/wikilinkSuggestion.js'
+import 'tippy.js/dist/tippy.css'
 
 export default {
   components: {
@@ -61,18 +64,50 @@ export default {
 
         if (this.editor && this.currentNote) {
           this.editor.commands.setContent(this.currentNote.content || '<p>Untitled</p>')
+          this.updateWikilinks()
         }
       },
+    },
+    notes: {
+      handler() {
+        // Update wikilinks when note titles change
+        if (this.editor) {
+          this.updateWikilinks()
+        }
+      },
+      deep: true,
     },
   },
 
   mounted() {
+    const notesStore = useNotesStore()
+
     this.editor = new Editor({
       content: this.currentNote?.content || '<p>Untitled</p>',
-      extensions: [StarterKit, Markdown],
+      extensions: [
+        StarterKit,
+        Markdown,
+        Wikilink.configure({
+          suggestion: wikilinkSuggestion,
+          HTMLAttributes: {
+            class: 'wikilink',
+          },
+        }),
+      ],
       editorProps: {
         attributes: {
           spellcheck: 'false',
+        },
+        handleClickOn: (view, pos, node, nodePos, event) => {
+          if (node.type.name === 'wikilink') {
+            event.preventDefault()
+            const noteId = node.attrs.id
+            if (noteId) {
+              this.openNote(noteId)
+            }
+            return true
+          }
+          return false
         },
       },
       onUpdate: ({ editor }) => {
@@ -90,6 +125,11 @@ export default {
         }
       },
     })
+
+    // Store the notes store in editor storage for the wikilink extension
+    this.editor.storage.wikilink = {
+      notesStore,
+    }
 
     this.loadNotes()
   },
@@ -117,6 +157,36 @@ export default {
       this.saveTimeout = setTimeout(() => {
         this.saveCurrent()
       }, 1000)
+    },
+
+    updateWikilinks() {
+      if (!this.editor) return
+
+      // Update wikilink labels based on current note titles
+      const { state } = this.editor
+      const { tr } = state
+      let modified = false
+
+      state.doc.descendants((node, pos) => {
+        if (node.type.name === 'wikilink') {
+          const noteId = node.attrs.id
+          const note = this.notes.find((n) => n.id === noteId)
+          if (note) {
+            const newLabel = note.title || 'Untitled'
+            if (node.attrs.label !== newLabel) {
+              tr.setNodeMarkup(pos, undefined, {
+                ...node.attrs,
+                label: newLabel,
+              })
+              modified = true
+            }
+          }
+        }
+      })
+
+      if (modified) {
+        this.editor.view.dispatch(tr)
+      }
     },
   },
 }
@@ -242,6 +312,20 @@ export default {
     border: none;
     border-top: 1.2px solid #1b4a8b;
     margin: 2rem 2rem;
+  }
+
+  /* Wikilink styles */
+  span[data-type='wikilink'] {
+    color: #1b4a8b;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: none;
+    border-bottom: 1px solid #1b4a8b;
+    padding: 0 2px;
+
+    &:hover {
+      background-color: #1b4a8b1a;
+    }
   }
 }
 
