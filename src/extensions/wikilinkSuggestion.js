@@ -33,6 +33,7 @@ export default {
           attrs: {
             id: props.id,
             label: props.label,
+            exists: true, // Items from the list always exist
           },
         },
         {

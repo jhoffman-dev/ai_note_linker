@@ -1,6 +1,7 @@
 import { Node, mergeAttributes } from '@tiptap/core'
 import { PluginKey } from '@tiptap/pm/state'
 import Suggestion from '@tiptap/suggestion'
+import { InputRule } from '@tiptap/core'
 
 export const WikilinkPluginKey = new PluginKey('wikilink')
 
@@ -57,6 +58,15 @@ export const Wikilink = Node.create({
           }
         },
       },
+      exists: {
+        default: true,
+        parseHTML: (element) => element.getAttribute('data-exists') !== 'false',
+        renderHTML: (attributes) => {
+          return {
+            'data-exists': attributes.exists,
+          }
+        },
+      },
     }
   },
 
@@ -71,7 +81,16 @@ export const Wikilink = Node.create({
   renderHTML({ node, HTMLAttributes }) {
     return [
       'span',
-      mergeAttributes({ 'data-type': 'wikilink' }, this.options.HTMLAttributes, HTMLAttributes),
+      mergeAttributes({ 'data-type': 'wikilink' }, this.options.HTMLAttributes, HTMLAttributes, {
+        onclick: `(function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const id = e.target.getAttribute('data-id');
+            const label = e.target.getAttribute('data-label');
+            const exists = e.target.getAttribute('data-exists') !== 'false';
+            window.wikilinkClick && window.wikilinkClick(id, label, exists);
+          })(event)`,
+      }),
       `[[${node.attrs.label}]]`,
     ]
   },
@@ -103,6 +122,44 @@ export const Wikilink = Node.create({
           return isWikilink
         }),
     }
+  },
+
+  addInputRules() {
+    return [
+      new InputRule({
+        find: /\[\[([^\]]+)\]\]$/,
+        handler: ({ state, range, match }) => {
+          const { tr } = state
+          const label = match[1]
+
+          // Check if a note with this title exists
+          const notesStore = this.editor.storage.wikilink?.notesStore
+          let noteId = null
+          let exists = false
+
+          if (notesStore) {
+            const matchingNote = notesStore.notes.find((n) => (n.title || 'Untitled') === label)
+            if (matchingNote) {
+              noteId = matchingNote.id
+              exists = true
+            }
+          }
+
+          const start = range.from
+          const end = range.to
+
+          tr.replaceWith(
+            start,
+            end,
+            this.type.create({
+              id: noteId,
+              label: label,
+              exists: exists,
+            }),
+          )
+        },
+      }),
+    ]
   },
 
   addProseMirrorPlugins() {

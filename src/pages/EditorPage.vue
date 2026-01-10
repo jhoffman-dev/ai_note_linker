@@ -126,6 +126,7 @@ export default {
         // Update wikilinks when note titles change
         if (this.editor) {
           this.updateWikilinks()
+          this.updateWikilinkExistence()
         }
       },
       deep: true,
@@ -259,12 +260,102 @@ export default {
       notesStore,
     }
 
+    // Add wikilink click handler
+    window.wikilinkClick = async (id, label, exists) => {
+      if (exists && id) {
+        // Open existing note
+        notesStore.openNote(id)
+      } else {
+        // Save the current note's ID and content before creating new note
+        const originalNoteId = notesStore.currentNote?.id
+        const originalContent = this.editor?.getHTML()
+
+        // Create new note with the wikilink text as title
+        await notesStore.createNote()
+        const newNoteId = notesStore.currentNote.id
+
+        // Set the title and content, then save the new note
+        notesStore.currentNote.title = label
+        notesStore.currentNote.content = `<h1>${label}</h1><p></p>`
+        await notesStore.saveCurrent()
+
+        // Reload notes to update the sidebar
+        await notesStore.loadNotes()
+
+        // Reopen the note to ensure currentNote has the latest data
+        notesStore.openNote(newNoteId)
+
+        // Update the editor to reflect the new content
+        if (this.editor) {
+          this.editor.commands.setContent(notesStore.currentNote.content)
+        }
+
+        // Update the wikilink in the original note without switching to it
+        if (originalNoteId && originalContent) {
+          // Get the original note from the database
+          const originalNote = await window.notesApi.get(originalNoteId)
+
+          if (originalNote) {
+            // Parse the original content and update wikilinks
+            const parser = new DOMParser()
+            const doc = parser.parseFromString(originalNote.content, 'text/html')
+            const wikilinks = doc.querySelectorAll('span[data-type="wikilink"]')
+
+            let modified = false
+            wikilinks.forEach((wikilink) => {
+              if (
+                wikilink.getAttribute('data-label') === label &&
+                !wikilink.getAttribute('data-id')
+              ) {
+                wikilink.setAttribute('data-id', newNoteId)
+                wikilink.setAttribute('data-exists', 'true')
+                modified = true
+              }
+            })
+
+            if (modified) {
+              const updatedContent = doc.body.innerHTML
+              // Update the original note in the database
+              await window.notesApi.upsert({
+                ...originalNote,
+                content: updatedContent,
+                updated_at: new Date().toISOString(),
+              })
+
+              // Get existing links for the original note and add the new one
+              const existingLinks = []
+              const allLinks = await window.notesApi.getAllLinks?.()
+              if (allLinks) {
+                allLinks.forEach((link) => {
+                  if (link.from_id === originalNoteId && link.source === 'user_wikilink') {
+                    existingLinks.push(link.to_id)
+                  }
+                })
+              }
+
+              // Add the new link if not already present
+              if (!existingLinks.includes(newNoteId)) {
+                existingLinks.push(newNoteId)
+              }
+
+              // Update the links
+              await window.notesApi.updateLinks(originalNoteId, existingLinks, 'user_wikilink')
+            }
+          }
+        }
+
+        // Reload notes to refresh the list
+        await notesStore.loadNotes()
+      }
+    }
+
     this.loadNotes()
 
     // Sync tasks from database on mount if there's a current note
     if (this.currentNote) {
       this.$nextTick(() => {
         this.syncTasksFromDatabase()
+        this.updateWikilinkExistence()
       })
     }
   },
@@ -289,6 +380,7 @@ export default {
     if (this.editor) {
       this.editor.destroy()
     }
+    delete window.wikilinkClick
   },
 
   methods: {
@@ -326,6 +418,11 @@ export default {
 
       // Update the links in the database
       this.updateNoteLinks(this.currentNote.id, linkedNoteIds)
+
+      // Update wikilink existence status
+      this.$nextTick(() => {
+        this.updateWikilinkExistence()
+      })
     },
 
     extractAndSaveTasks() {
@@ -372,6 +469,54 @@ export default {
               })
               modified = true
             }
+          }
+        }
+      })
+
+      if (modified) {
+        this.editor.view.dispatch(tr)
+      }
+    },
+
+    updateWikilinkExistence() {
+      if (!this.editor) return
+
+      const { state } = this.editor
+      const tr = state.tr
+      let modified = false
+
+      state.doc.descendants((node, pos) => {
+        if (node.type.name === 'wikilink') {
+          const noteId = node.attrs.id
+          const label = node.attrs.label
+
+          // Check if note exists by ID or by matching title
+          let exists = false
+          if (noteId) {
+            exists = this.notes.some((n) => n.id === noteId)
+          }
+          if (!exists && label) {
+            // Check if a note with this title exists
+            const matchingNote = this.notes.find((n) => (n.title || 'Untitled') === label)
+            if (matchingNote) {
+              // Update the wikilink to point to the existing note
+              exists = true
+              tr.setNodeMarkup(pos, undefined, {
+                ...node.attrs,
+                id: matchingNote.id,
+                exists: true,
+              })
+              modified = true
+            }
+          }
+
+          // Update exists attribute if it changed
+          if (node.attrs.exists !== exists && !modified) {
+            tr.setNodeMarkup(pos, undefined, {
+              ...node.attrs,
+              exists,
+            })
+            modified = true
           }
         }
       })
@@ -554,6 +699,10 @@ export default {
 
     &:hover {
       background-color: #1b4a8b1a;
+    }
+
+    &[data-exists='false'] {
+      color: #6ba3d8;
     }
   }
 
