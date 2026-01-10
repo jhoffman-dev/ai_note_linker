@@ -27,3 +27,11 @@
  *   }
  * }
  */
+
+import { contextBridge, ipcRenderer } from 'electron'
+
+contextBridge.exposeInMainWorld('notesApi', {
+  list: () => ipcRenderer.invoke('notes:list'),
+  get: (id) => ipcRenderer.invoke('notes:get', id),
+  upsert: (note) => ipcRenderer.invoke('notes:upsert', note),
+})

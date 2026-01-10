@@ -1,24 +1,3 @@
-<!-- <template>
-  <q-splitter
-    v-model="splitterModel"
-    horizontal
-    style="height: 400px"
-    separator-style="height:2px"
-    separator-class="bg-black"
-  >
-    <template v-slot:before>
-      <div style="height: 100%">
-        <editor-content :editor="editor" class="full-height editor-wrapper" />
-      </div>
-    </template>
-
-    <template v-slot:after>
-      <div style="height: 100%">
-        <h5 style="text-align: center; padding-top: 10px">Pane 2</h5>
-      </div>
-    </template>
-  </q-splitter>
-</template> -->
 <template>
   <q-page class="editor-page">
     <div class="splitter-container">
@@ -48,10 +27,11 @@
 </template>
 
 <script>
-// import { ref } from 'vue'
 import { EditorContent, Editor } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import { Markdown } from '@tiptap/markdown'
+import { useNotesStore } from 'src/stores/notes-store'
+import { mapState, mapActions } from 'pinia'
 
 export default {
   components: {
@@ -62,20 +42,82 @@ export default {
     return {
       editor: null,
       splitterModel: 60,
+      saveTimeout: null,
+      previousNoteId: null,
     }
+  },
+
+  computed: {
+    ...mapState(useNotesStore, ['currentNote', 'notes', 'loading']),
+  },
+
+  watch: {
+    'currentNote.id': {
+      async handler(newId, oldId) {
+        // Save the previous note before switching
+        if (oldId && oldId !== newId) {
+          await this.saveCurrent()
+        }
+
+        if (this.editor && this.currentNote) {
+          this.editor.commands.setContent(this.currentNote.content || '<p>Untitled</p>')
+        }
+      },
+    },
   },
 
   mounted() {
     this.editor = new Editor({
-      content: "<p>I'm running Tiptap with Vue.js. 🎉</p>",
+      content: this.currentNote?.content || '<p>Untitled</p>',
       extensions: [StarterKit, Markdown],
+      editorProps: {
+        attributes: {
+          spellcheck: 'false',
+        },
+      },
+      onUpdate: ({ editor }) => {
+        if (this.currentNote) {
+          const html = editor.getHTML()
+          this.currentNote.content = html
+
+          // Extract title from first line
+          const text = editor.getText()
+          const firstLine = text.split('\n')[0].trim()
+          this.currentNote.title = firstLine || 'Untitled'
+
+          // Debounced save
+          this.debounceSave()
+        }
+      },
     })
+
+    this.loadNotes()
   },
 
   beforeUnmount() {
+    // Save before leaving
+    if (this.saveTimeout) {
+      clearTimeout(this.saveTimeout)
+    }
+    if (this.currentNote) {
+      this.saveCurrent()
+    }
     if (this.editor) {
       this.editor.destroy()
     }
+  },
+
+  methods: {
+    ...mapActions(useNotesStore, ['loadNotes', 'openNote', 'saveCurrent']),
+
+    debounceSave() {
+      if (this.saveTimeout) {
+        clearTimeout(this.saveTimeout)
+      }
+      this.saveTimeout = setTimeout(() => {
+        this.saveCurrent()
+      }, 1000)
+    },
   },
 }
 </script>

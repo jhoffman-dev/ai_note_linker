@@ -2,6 +2,14 @@ import { app, BrowserWindow } from 'electron'
 import path from 'node:path'
 import os from 'node:os'
 import { fileURLToPath } from 'node:url'
+import { ipcMain } from 'electron'
+import { getNote, listNotes, upsertNote } from './db/index.js'
+
+export function registerIpcHandlers() {
+  ipcMain.handle('notes:list', () => listNotes())
+  ipcMain.handle('notes:get', (_evt, id) => getNote(id))
+  ipcMain.handle('notes:upsert', (_evt, note) => upsertNote(note))
+}
 
 // needed in case process is undefined under Linux
 const platform = process.platform || os.platform()
@@ -10,7 +18,7 @@ const currentDir = fileURLToPath(new URL('.', import.meta.url))
 
 let mainWindow
 
-async function createWindow () {
+async function createWindow() {
   /**
    * Initial window options
    */
@@ -24,9 +32,12 @@ async function createWindow () {
       // More info: https://v2.quasar.dev/quasar-cli-vite/developing-electron-apps/electron-preload-script
       preload: path.resolve(
         currentDir,
-        path.join(process.env.QUASAR_ELECTRON_PRELOAD_FOLDER, 'electron-preload' + process.env.QUASAR_ELECTRON_PRELOAD_EXTENSION)
-      )
-    }
+        path.join(
+          process.env.QUASAR_ELECTRON_PRELOAD_FOLDER,
+          'electron-preload' + process.env.QUASAR_ELECTRON_PRELOAD_EXTENSION,
+        ),
+      ),
+    },
   })
 
   if (process.env.DEV) {
@@ -49,6 +60,8 @@ async function createWindow () {
     mainWindow = null
   })
 }
+
+registerIpcHandlers()
 
 app.whenReady().then(createWindow)
 
