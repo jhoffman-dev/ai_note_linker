@@ -35,7 +35,7 @@ export const useNotesStore = defineStore('notes', {
       const newNote = {
         id: crypto.randomUUID(),
         title: 'Untitled',
-        content: '<p>Untitled</p>',
+        content: '<h1>Untitled</h1><p></p>',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         favorite: 0,

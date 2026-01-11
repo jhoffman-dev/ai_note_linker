@@ -617,6 +617,7 @@ export default {
   h1 {
     font-size: 1.8rem;
     font-weight: bold;
+    text-align: center;
   }
 
   h2 {
